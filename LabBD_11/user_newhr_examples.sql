@@ -1,0 +1,48 @@
+SELECT * FROM hr.regions;
+GRANT select ON hr.regions TO other;
+-- next run other scripts up to this point
+
+select * from hr.regions;
+-- next run other scripts up to this point
+
+select * from hr.COUNTRIES;
+GRANT select ON hr. COUNTRIES TO other;
+-- next is hr
+
+select * from hr.COUNTRIES;
+-- next is hr
+
+SELECT * FROM   hr.departments;
+-- next is newhr
+
+/*
+FILE/OPEN --- ?????? ?? ???? departments.sql. ?????????? ?? ????????????? ? RUN/SCRIPT.
+?????????? ? ?? ?? ?????? ?????????? newhr.
+? ???????? ?????? ?? ?? ??????? ??????? departments ? ?????.
+*/
+
+--next is newhr
+
+GRANT SELECT ON departments TO hr;
+-- next is hr
+
+SELECT * FROM   departments;
+-- next is hr
+
+INSERT INTO departments(department_id, department_name) VALUES (510, 'Human Resources');
+COMMIT;
+-- next is hr
+
+CREATE SYNONYM hr FOR hr.DEPARTMENTS;
+-- next is newhr
+
+SELECT * FROM   hr;
+-- next is hr
+
+DROP SYNONYM hr;
+REVOKE SELECT ON departments FROM   hr;
+DELETE FROM departments WHERE department_id = 510;
+COMMIT;
+SELECT * FROM   departments;
+-- end
+

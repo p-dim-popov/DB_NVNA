@@ -35,7 +35,7 @@ FROM dual;
 
 SELECT GET_YEARS_SERVICE(300) -- error
 FROM dual;
-
+--TODO: plsql block
 -- 2
 BEGIN
     DROP_TABLE_IF_EXISTS('problem_2_table');
@@ -119,74 +119,86 @@ CREATE TABLE ERROR_DEPART AS (SELECT *
 CREATE OR REPLACE FUNCTION DEPARTMENT_EXISTS(input_department_id IN DEPT.DEPARTMENT_ID%TYPE)
     RETURN BOOLEAN
     IS
-    var_department_id input_department_id%TYPE;
+    var_department_id DEPT.DEPARTMENT_ID%TYPE;
 BEGIN
-    SELECT DEPARTMENT_ID > 0
+    SELECT DEPARTMENT_ID
     INTO var_department_id
     FROM DEPT
     WHERE DEPARTMENT_ID = input_department_id;
+
     RETURN TRUE;
+
 EXCEPTION
-    WHEN no_data_found
-        THEN RETURN FALSE;
+    WHEN no_data_found THEN
+        RETURN FALSE;
 END;
 
 CREATE OR REPLACE FUNCTION IS_DEPARTMENT_NAME_AVAILABLE(input_department_name IN DEPT.DEPARTMENT_NAME%TYPE)
     RETURN BOOLEAN
     IS
-    var_department_name input_department_name%TYPE;
+    var_department_name DEPT.DEPARTMENT_NAME%TYPE;
 BEGIN
-    SELECT DEPARTMENT_NAME
+    SELECT DISTINCT DEPARTMENT_NAME
     INTO var_department_name
     FROM DEPT
     WHERE DEPARTMENT_NAME = input_department_name;
+
     RETURN FALSE;
+
 EXCEPTION
-    WHEN no_data_found
-        THEN RETURN TRUE;
+    WHEN no_data_found THEN
+        RETURN TRUE;
 END;
 
 CREATE OR REPLACE FUNCTION LOCATION_EXISTS(input_location_id IN LOCATIONS.LOCATION_ID%TYPE)
     RETURN BOOLEAN
     IS
-    var_location_id input_location_id%TYPE;
+    var_location_id LOCATIONS.LOCATION_ID%TYPE;
 BEGIN
     SELECT LOCATION_ID
     INTO var_location_id
     FROM LOCATIONS
     WHERE LOCATION_ID = input_location_id;
+
     RETURN TRUE;
+
 EXCEPTION
-    WHEN no_data_found
-        THEN RETURN FALSE;
+    WHEN no_data_found THEN
+        RETURN FALSE;
 END;
 
 CREATE OR REPLACE FUNCTION EMPLOYEE_EXISTS(input_employee_id IN EMPLOYEES.EMPLOYEE_ID%TYPE)
     RETURN BOOLEAN
     IS
+    var_employee_id EMPLOYEES.EMPLOYEE_ID%TYPE;
 BEGIN
     SELECT EMPLOYEE_ID
-    INTO input_employee_id
+    INTO var_employee_id
     FROM EMPLOYEES
     WHERE EMPLOYEE_ID = input_employee_id;
+
     RETURN TRUE;
+
 EXCEPTION
-    WHEN no_data_found
-        THEN RETURN FALSE;
+    WHEN no_data_found THEN
+        RETURN FALSE;
 END;
 
 CREATE OR REPLACE FUNCTION IS_EMPLOYEE_MANAGER(input_employee_id IN EMPLOYEES.EMPLOYEE_ID%TYPE)
     RETURN BOOLEAN
     IS
+    var_employee_id EMPLOYEES.EMPLOYEE_ID%TYPE;
 BEGIN
-    SELECT MANAGER_ID
-    INTO input_employee_id
+    SELECT DISTINCT MANAGER_ID
+    INTO var_employee_id
     FROM EMPLOYEES
     WHERE MANAGER_ID = input_employee_id;
+
     RETURN TRUE;
+
 EXCEPTION
-    WHEN no_data_found
-        THEN RETURN FALSE;
+    WHEN no_data_found THEN
+        RETURN FALSE;
 END;
 
 
@@ -196,9 +208,20 @@ CREATE OR REPLACE PROCEDURE ADD_DEPARTMENT(param_department_id IN DEPT.departmen
                                            param_manager_id IN DEPT.manager_id%TYPE,
                                            do_commit IN BOOLEAN)
     IS
+    department_exists_exc EXCEPTION;
+    department_name_not_avail_exc EXCEPTION;
+    location_does_not_exist_exc EXCEPTION;
+    employee_does_not_exist_exc EXCEPTION;
+    employee_is_manager_exc EXCEPTION;
+
+    PRAGMA EXCEPTION_INIT ( department_exists_exc, -20001 );
+    PRAGMA EXCEPTION_INIT ( department_name_not_avail_exc, -20002 );
+    PRAGMA EXCEPTION_INIT ( location_does_not_exist_exc, -20003 );
+    PRAGMA EXCEPTION_INIT ( employee_does_not_exist_exc, -20004 );
+    PRAGMA EXCEPTION_INIT ( employee_is_manager_exc, -20005 );
 BEGIN
 
-    IF DEPARTMENT_EXISTS(param_manager_id)
+    IF DEPARTMENT_EXISTS(param_department_id)
     THEN
         raise_application_error(-20001, 'Duplicate of PK (Department_Id) ' || param_department_id);
     END IF;
@@ -213,7 +236,7 @@ BEGIN
         raise_application_error(-20003, 'No corresponding FK exist (Location_Id) ' || param_location_id);
     END IF;
 
-    IF EMPLOYEE_EXISTS(param_manager_id)
+    IF EMPLOYEE_EXISTS(param_manager_id) = FALSE
     THEN
         raise_application_error(-20004, 'No corresponding FK exist (Employee_Id) ' || param_manager_id);
     END IF;
@@ -235,10 +258,15 @@ BEGIN
 
 EXCEPTION
     WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE(sqlerrm());
+        DBMS_OUTPUT.PUT_LINE(sqlerrm);
         INSERT INTO
             ERROR_DEPART(department_id, department_name, manager_id, location_id)
         VALUES (param_department_id, param_department_title, param_manager_id, param_location_id);
+        IF do_commit THEN
+            COMMIT;
+        ELSE
+            ROLLBACK;
+        END IF;
 END;
 
 BEGIN
@@ -246,8 +274,9 @@ BEGIN
             280,
             'Politics',
             1000,
-            100,
-            TRUE); -- All correct
+            104,
+            TRUE);
+    -- All correct
 END;
 
 BEGIN
@@ -255,17 +284,19 @@ BEGIN
             100,
             'Politics2',
             1000,
-            100,
-            TRUE); -- Existing department id
+            105,
+            TRUE);
+    -- Existing department id
 END;
 
 BEGIN
     ADD_DEPARTMENT(
             290,
-            'Politics',
+            'Executive',
             1000,
-            100,
-            TRUE); -- Duplicate name
+            106,
+            TRUE);
+    -- Duplicate name
 END;
 
 BEGIN
@@ -273,7 +304,7 @@ BEGIN
             300,
             'Politics3',
             3300,
-            100,
+            107,
             TRUE); -- Not existing location
 END;
 
@@ -285,3 +316,13 @@ BEGIN
             207,
             TRUE); -- Not existing employee
 END;
+
+BEGIN
+    ADD_DEPARTMENT(
+            320,
+            'Politics5',
+            1000,
+            100,
+            TRUE); -- Employee is manager
+END;
+

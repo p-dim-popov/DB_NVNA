@@ -26,27 +26,26 @@ BEGIN
 EXCEPTION
     WHEN no_data_found THEN
         DBMS_OUTPUT.PUT_LINE('Employee with id ' || input_employee_id || ' does not exist!');
-        raise_application_error(-20999, '');
         RETURN -1;
 END;
 
-SELECT GET_YEARS_SERVICE(100) -- works
-FROM dual;
-
-SELECT GET_YEARS_SERVICE(300) -- error
-FROM dual;
---TODO: plsql block
--- 2
-BEGIN
-    DROP_TABLE_IF_EXISTS('problem_2_table');
-END;
-
-CREATE TABLE problem_2_table AS (SELECT *
-                                 FROM EMPLOYEES
-                                 WHERE 1 = 2);
-
 DECLARE
-    var_employee_row employees%ROWTYPE;
+    var_employee_id      NUMBER := &emp_id;
+    var_years_of_service NUMBER := GET_YEARS_SERVICE(var_employee_id);
+BEGIN
+    IF var_years_of_service <> -1 THEN
+        DBMS_OUTPUT.PUT_LINE('Years of service of employee number ' || var_employee_id || ': ' || var_years_of_service);
+    END IF;
+END ;
+-- 100 (works)
+-- 300 (error)
+
+-- 2
+DECLARE
+    TYPE EMPLOYEES_TABLE_TYPE IS TABLE OF employees%ROWTYPE INDEX BY BINARY_INTEGER;
+    employees_table             EMPLOYEES_TABLE_TYPE;
+    var_employee_row            employees%ROWTYPE;
+    var_employees_table_indexes NUMBER := 0;
 BEGIN
     FOR counter IN 100..108
         LOOP
@@ -61,10 +60,20 @@ BEGIN
             -------------------
 
             IF GET_YEARS_SERVICE(var_employee_row.EMPLOYEE_ID) > 15 THEN
-                INSERT INTO PROBLEM_2_TABLE VALUES var_employee_row;
+                var_employees_table_indexes := var_employees_table_indexes + 1;
+                employees_table(var_employees_table_indexes) := var_employee_row;
             END IF;
         END LOOP;
-    COMMIT;
+
+    DBMS_OUTPUT.PUT_LINE('');
+
+    FOR counter IN 1..var_employees_table_indexes
+        LOOP
+            DBMS_OUTPUT.PUT_LINE('Employee number ' || employees_table(counter).EMPLOYEE_ID ||
+                                 ' (Name: ' || employees_table(counter).FIRST_NAME || ')' ||
+                                 ' is working here for ' || GET_YEARS_SERVICE(employees_table(counter).EMPLOYEE_ID) ||
+                                 ' years');
+        END LOOP;
 END;
 
 -- 3
@@ -97,7 +106,7 @@ BEGIN
         WHERE CURRENT OF cursor_c;
     END LOOP;
     CLOSE cursor_c;
-    ROLLBACK;
+    COMMIT;
 END;
 
 -- 4
@@ -205,8 +214,7 @@ END;
 CREATE OR REPLACE PROCEDURE ADD_DEPARTMENT(param_department_id IN DEPT.department_id%TYPE,
                                            param_department_title IN DEPT.department_name%TYPE,
                                            param_location_id IN DEPT.location_id%TYPE,
-                                           param_manager_id IN DEPT.manager_id%TYPE,
-                                           do_commit IN BOOLEAN)
+                                           param_manager_id IN DEPT.manager_id%TYPE)
     IS
     department_exists_exc EXCEPTION;
     department_name_not_avail_exc EXCEPTION;
@@ -250,23 +258,15 @@ BEGIN
         DEPT (department_id, department_name, manager_id, location_id)
     VALUES (param_department_id, param_department_title, param_manager_id, param_location_id);
 
-    IF do_commit THEN
-        COMMIT;
-    ELSE
-        ROLLBACK;
-    END IF;
-
+    COMMIT;
 EXCEPTION
     WHEN OTHERS THEN
         DBMS_OUTPUT.PUT_LINE(sqlerrm);
         INSERT INTO
             ERROR_DEPART(department_id, department_name, manager_id, location_id)
         VALUES (param_department_id, param_department_title, param_manager_id, param_location_id);
-        IF do_commit THEN
-            COMMIT;
-        ELSE
-            ROLLBACK;
-        END IF;
+
+        COMMIT;
 END;
 
 BEGIN
@@ -274,8 +274,7 @@ BEGIN
             280,
             'Politics',
             1000,
-            104,
-            TRUE);
+            104);
     -- All correct
 END;
 
@@ -284,8 +283,7 @@ BEGIN
             100,
             'Politics2',
             1000,
-            105,
-            TRUE);
+            105);
     -- Existing department id
 END;
 
@@ -294,8 +292,7 @@ BEGIN
             290,
             'Executive',
             1000,
-            106,
-            TRUE);
+            106);
     -- Duplicate name
 END;
 
@@ -304,8 +301,8 @@ BEGIN
             300,
             'Politics3',
             3300,
-            107,
-            TRUE); -- Not existing location
+            107);
+    -- Not existing location
 END;
 
 BEGIN
@@ -313,8 +310,8 @@ BEGIN
             310,
             'Politics4',
             1000,
-            207,
-            TRUE); -- Not existing employee
+            207);
+    -- Not existing employee
 END;
 
 BEGIN
@@ -322,7 +319,7 @@ BEGIN
             320,
             'Politics5',
             1000,
-            100,
-            TRUE); -- Employee is manager
+            100);
+    -- Employee is manager
 END;
 
